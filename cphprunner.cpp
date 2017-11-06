@@ -48,16 +48,19 @@ void CPHPRunner::getArgs(std::vector<std::string> *retargs) {
 }
 
 void CPHPRunner::fixPHParguments(int argc, char **argv) {
-    char                    cwd[PATH_MAX];
+    // most of the fixes are not needed, just keep it as a comment if i have to do something with it.
+    //char                    cwd[PATH_MAX];
     std::string             args_merged;
     //std::string			opt_userdir("user_dir=");
 
-    memset(cwd,0,PATH_MAX);
+    //memset(cwd,0,PATH_MAX);
 
+    /*
     if (getcwd(cwd, PATH_MAX) == NULL) {
         perror("ERROR: getcwd()");
         throw std::runtime_error( "getcwd failed" );
     }
+    */
 
     //opt_userdir += cwd;
 
@@ -77,6 +80,8 @@ void CPHPRunner::fixPHParguments(int argc, char **argv) {
         args.push_back(argv[i]);
     }
 
+
+    /*
     if (args_merged.find("-r ") != std::string::npos)
         return;
 
@@ -94,7 +99,9 @@ void CPHPRunner::fixPHParguments(int argc, char **argv) {
         if (strstr(resolved_path, "/tank/www") == resolved_path) {
             this->args[i] = resolved_path+5;
         }
+
     }
+    */
 
 }
 

@@ -9,12 +9,12 @@ all: $(DOCKERRUNNER)
 static: $(DOCKERRUNNER).static
 
 $(DOCKERRUNNER): $(OBJS)
-                $(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 $(DOCKERRUNNER).static: $(OBJS)
-                $(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -static
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -static
 
 %.o: %.cpp %.h
-                $(CXX) -c $(CXXFLAGS) -o $@ $<
+	$(CXX) -c $(CXXFLAGS) -o $@ $<
 clean:
-                rm -f $(DOCKERRUNNER) $(OBJS)
+	rm -f $(DOCKERRUNNER) $(OBJS)
