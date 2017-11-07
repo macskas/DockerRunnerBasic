@@ -41,8 +41,7 @@ void handle_getopt(int argc, char **argv)
 
     memset(resolved_path, 0, PATH_MAX);
     if (lstat(argv[0], &sb_original) == -1) {
-        perror("stat");
-        exit(EXIT_FAILURE);
+        return;
     };
 
     if (!realpath(argv[0], resolved_path)) {
@@ -51,8 +50,7 @@ void handle_getopt(int argc, char **argv)
     }
 
     if (stat(argv[0], &sb_realpath) == -1) {
-        perror("stat");
-        exit(EXIT_FAILURE);
+        return;
     };
     if (sb_original.st_ino != sb_realpath.st_ino) {
         // show help only if is called directly
