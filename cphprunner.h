@@ -18,7 +18,7 @@ public:
     CPHPRunner();
 
     void selectPHPVersion(const char *argv0);
-    void fixPHParguments(int argc, char **argv);
+    void buildPHParguments(int argc, char **argv);
 
     void getSelectedVersion(std::string *retstring);
     void getArgs(std::vector<std::string> *retargs);

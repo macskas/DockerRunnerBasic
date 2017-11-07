@@ -10,7 +10,6 @@
 
 extern "C" {
     #include <limits.h>
-    #include <cstdio>
     #include <sys/dir.h>
     #include <unistd.h>
     #include <signal.h>

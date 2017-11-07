@@ -28,12 +28,15 @@ bool CPHPRunner::isPHPLocked() {
 }
 
 void CPHPRunner::selectPHPVersion(const char *argv0) {
-    char *bname = basename((char*)argv0);
+    char *dupargv = strdup(argv0);
+    char *dupargv_original = dupargv;
+    char *bname = basename(dupargv);
     if (this->allowed_version.find(bname) != this->allowed_version.end()) {
         this->selected_version = bname;
     } else {
         this->selected_version = this->default_version;
     }
+    free(dupargv_original);
 
 }
 
@@ -47,27 +50,9 @@ void CPHPRunner::getArgs(std::vector<std::string> *retargs) {
     return;
 }
 
-void CPHPRunner::fixPHParguments(int argc, char **argv) {
-    // most of the fixes are not needed, just keep it as a comment if i have to do something with it.
-    //char                    cwd[PATH_MAX];
+void CPHPRunner::buildPHParguments(int argc, char **argv) {
     std::string             args_merged;
-    //std::string			opt_userdir("user_dir=");
-
-    //memset(cwd,0,PATH_MAX);
-
-    /*
-    if (getcwd(cwd, PATH_MAX) == NULL) {
-        perror("ERROR: getcwd()");
-        throw std::runtime_error( "getcwd failed" );
-    }
-    */
-
-    //opt_userdir += cwd;
-
     this->args.push_back("/usr/bin/php");
-    //this->args.push_back("-d"); this->args.push_back(opt_userdir);
-    //this->args.push_back("-d"); this->args.push_back("auto_prepend_file=/www/cli-prepend.php");
-
     for (int i=1; i<argc; i++) {
         if (argv[i] == NULL)
             break;
@@ -79,29 +64,6 @@ void CPHPRunner::fixPHParguments(int argc, char **argv) {
         }
         args.push_back(argv[i]);
     }
-
-
-    /*
-    if (args_merged.find("-r ") != std::string::npos)
-        return;
-
-    char resolved_path[PATH_MAX];
-    memset(resolved_path, 0, PATH_MAX);
-
-    for (size_t i=0; i<this->args.size(); i++) {
-        if (!realpath(this->args[i].c_str(), resolved_path)) {
-            continue;
-        }
-
-        if (access(resolved_path, R_OK) == -1)
-            continue;
-
-        if (strstr(resolved_path, "/tank/www") == resolved_path) {
-            this->args[i] = resolved_path+5;
-        }
-
-    }
-    */
 
 }
 
