@@ -9,18 +9,52 @@
 #include <cstdio>
 
 extern "C" {
-    #include <limits.h>
-    #include <sys/dir.h>
-    #include <unistd.h>
-    #include <signal.h>
-    #include <sched.h>
-    #include <fcntl.h>
-    #include <sys/types.h>
-    #include <pwd.h>
+#include <limits.h>
+#include <sys/dir.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sched.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <grp.h>
+#include <sys/wait.h>
 }
 
 #include "cdockercontainer.h"
 #include "globals.h"
+
+
+static void continue_as_child(void)
+{
+    pid_t child = fork();
+    int status;
+    pid_t ret;
+
+    if (child < 0)
+        throw std::runtime_error("fork failed.");
+
+    /* Only the child returns */
+    if (child == 0)
+        return;
+
+    for (;;) {
+        ret = waitpid(child, &status, WUNTRACED);
+        if ((ret == child) && (WIFSTOPPED(status))) {
+            /* The child suspended so suspend us as well */
+            kill(getpid(), SIGSTOP);
+            kill(child, SIGCONT);
+        } else {
+            break;
+        }
+    }
+    /* Return the child's exit code if possible */
+    if (WIFEXITED(status)) {
+        exit(WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+        kill(getpid(), WTERMSIG(status));
+    }
+    exit(EXIT_FAILURE);
+}
 
 CDocker::CDocker() : dockerPath("/var/lib/docker/containers"), dockerConfig("config.v2.json"), maxConfigFileSize(1000000)
 {
@@ -167,8 +201,14 @@ int CDocker::findKeyInt(char *fcontent, const char *k, int *ret)
 void CDocker::setNSByHostname(std::string hostname) {
     std::map<std::string, CDockerContainer>::iterator	it;
     char                                                fbuf[PATH_MAX];
-    const char                                          *namespaces[] = { "ipc", "uts", "net", "pid", "mnt" };
-    int                                                 fd = -1;
+    NamespaceFile                                       *nsfile = NULL;
+
+    std::vector<class NamespaceFile*>                   namespace_files;
+    namespace_files.push_back(new NamespaceFile(CLONE_NEWIPC, "ipc"));
+    namespace_files.push_back(new NamespaceFile(CLONE_NEWUTS, "uts"));
+    namespace_files.push_back(new NamespaceFile(CLONE_NEWNET, "net"));
+    namespace_files.push_back(new NamespaceFile(CLONE_NEWPID, "pid"));
+    namespace_files.push_back(new NamespaceFile(CLONE_NEWNS,  "mnt"));
 
     it = this->dockerContainers.find(hostname);
     if (it == this->dockerContainers.end()) {
@@ -177,18 +217,24 @@ void CDocker::setNSByHostname(std::string hostname) {
     int pid = it->second.getPid();
 
     memset(fbuf, 0, PATH_MAX);
-    for (int i=0; i<5; i++) {
-        snprintf(fbuf, PATH_MAX, "/proc/%d/ns/%s", pid, namespaces[i]);
-        fd = open(fbuf, O_RDONLY);
-        if (fd == -1) {
+    for (int i=0, e=namespace_files.size(); i<e; ++i) {
+        nsfile = namespace_files[i];
+        snprintf(fbuf, PATH_MAX, "/proc/%d/ns/%s", pid, nsfile->name.c_str());
+        nsfile->fd = open(fbuf, O_RDONLY);
+        if (nsfile->fd == -1) {
             perror("open");
             throw std::runtime_error("NS open failed.");
         }
-        if (setns(fd, 0) == -1) {
+    }
+    for (int i=0, e=namespace_files.size(); i<e; ++i) {
+        nsfile = namespace_files[i];
+        if (setns(nsfile->fd, nsfile->nstype) == -1) {
             perror("setns");
             throw std::runtime_error("setns command failed.");
         }
-        close(fd);
+        nsfile->closefd();
+        delete nsfile;
+        namespace_files[i] = NULL;
     }
 }
 
@@ -217,8 +263,6 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
     }
     this->loadConfigDirectory();
 
-    struct passwd	*pw             = getpwuid(original_uid);
-
     const char      *execPath       = args[0].c_str();
     char            execName[PATH_MAX];
     memset(execName, 0, PATH_MAX);
@@ -230,14 +274,8 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
         new_argv[i] = (char*)args[i].c_str();
     }
 
-    if (!pw)
-        throw std::runtime_error("Failed to get user information for your user.");
-
-    const char		*homedir        = pw->pw_dir;
-    if (!homedir)
-        throw std::length_error("invalid homedir based on your user information");
-
     this->setNSByHostname(hostname);
+    continue_as_child();
 
     if (setgid(original_gid) != 0) {
         perror("setgid");
