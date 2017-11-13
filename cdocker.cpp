@@ -18,6 +18,7 @@ extern "C" {
 #include <sys/types.h>
 #include <grp.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 }
 
 #include "cdockercontainer.h"
@@ -26,6 +27,9 @@ extern "C" {
 
 static void continue_as_child(void)
 {
+    if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0) != 0) {
+        perror("prctl");
+    }
     pid_t child = fork();
     int status;
     pid_t ret;
@@ -34,8 +38,12 @@ static void continue_as_child(void)
         throw std::runtime_error("fork failed.");
 
     /* Only the child returns */
-    if (child == 0)
+    if (child == 0) {
+        if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0) != 0) {
+            perror("prctl");
+        }
         return;
+    }
 
     for (;;) {
         ret = waitpid(child, &status, WUNTRACED);
@@ -275,7 +283,7 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
     }
 
     this->setNSByHostname(hostname);
-    continue_as_child();
+
 
     if (setgid(original_gid) != 0) {
         perror("setgid");
@@ -296,6 +304,8 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
     if (chdir(cwd) != 0) {
 
     }
+
+    continue_as_child();
 
     return execv(execPath, new_argv);
 }
