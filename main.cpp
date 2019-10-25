@@ -76,6 +76,7 @@ int main(int argc, char **argv)
     std::string                 dockerHostname("-");
     CDocker                     Docker;
     CPHPRunner                  PHPRunner;
+    PHPRunner.setDefaultVersion();
     PHPRunner.selectPHPVersion(argv[0]);
     PHPRunner.buildPHParguments(argc, argv);
     PHPRunner.getArgs(&newargs);

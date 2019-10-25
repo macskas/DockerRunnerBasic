@@ -50,7 +50,7 @@ void CPHPRunner::setDefaultVersion() {
     }
 
     if (this->allowed_version.find(buffer) != this->allowed_version.end()) {
-        this->selected_version = buffer;
+        this->default_version = buffer;
     }
     fclose(f);
     return;
