@@ -17,6 +17,7 @@ private:
 public:
     CPHPRunner();
 
+    void setDefaultVersion();
     void selectPHPVersion(const char *argv0);
     void buildPHParguments(int argc, char **argv);
 

@@ -28,7 +28,34 @@ bool CPHPRunner::isPHPLocked() {
     return false;
 }
 
+void CPHPRunner::setDefaultVersion() {
+    const char *default_php_file = "/etc/docker-runner.default_php";
+    char        buffer[32];
+    memset(buffer, 0, 32);
+
+    FILE        *f;
+
+    if (access(default_php_file, R_OK) != 0)
+        return;
+
+    f = fopen(default_php_file, "r");
+    if (!f)
+        return;
+
+    if (fgets(buffer, 32, f) == NULL) {
+        fclose(f);
+        return;
+    }
+
+    if (this->allowed_version.find(buffer) != this->allowed_version.end()) {
+        this->selected_version = buffer;
+    }
+    fclose(f);
+    return;
+}
+
 void CPHPRunner::selectPHPVersion(const char *argv0) {
+
     char *dupargv = strdup(argv0);
     char *dupargv_original = dupargv;
     char *bname = basename(dupargv);
