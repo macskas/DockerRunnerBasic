@@ -33,6 +33,7 @@ bool CPHPRunner::isPHPLocked() {
 void CPHPRunner::setDefaultVersion() {
     const char *default_php_file = "/etc/docker-runner.default_php";
     char        buffer[32];
+    char        *pos = NULL;
     memset(buffer, 0, 32);
 
     FILE        *f;
