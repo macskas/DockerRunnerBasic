@@ -49,6 +49,12 @@ void CPHPRunner::setDefaultVersion() {
         return;
     }
 
+    pos = strchr(buffer, '\n');
+    if (pos) {
+        *pos = '\0';
+    }
+
+
     if (this->allowed_version.find(buffer) != this->allowed_version.end()) {
         this->default_version = buffer;
     }
