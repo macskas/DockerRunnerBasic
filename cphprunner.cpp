@@ -9,7 +9,7 @@ extern "C" {
     #include <libgen.h>
 }
 
-CPHPRunner::CPHPRunner() : default_version("php55"), lockFile("/var/lock/nophp")
+CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp")
 {
     this->allowed_version.insert("php53");
     this->allowed_version.insert("php55");
@@ -17,6 +17,8 @@ CPHPRunner::CPHPRunner() : default_version("php55"), lockFile("/var/lock/nophp")
     this->allowed_version.insert("php70");
     this->allowed_version.insert("php71");
     this->allowed_version.insert("php72");
+    this->allowed_version.insert("php73");
+    this->allowed_version.insert("php74");
 
     if (this->isPHPLocked())
         throw std::runtime_error("PHP cli is temporarily disabled");
