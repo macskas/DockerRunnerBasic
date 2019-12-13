@@ -13,6 +13,7 @@ private:
     std::string                 selected_version;
     std::vector<std::string>	args;
     std::string                 lockFile;
+    bool                        isPHPBin;
 
 public:
     CPHPRunner();

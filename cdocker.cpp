@@ -307,5 +307,5 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
 
     continue_as_child();
 
-    return execv(execPath, new_argv);
+    return execvp(execPath, new_argv);
 }

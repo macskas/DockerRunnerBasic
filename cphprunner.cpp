@@ -2,6 +2,9 @@
 
 #include <stdexcept>
 #include <cstring>
+#include <cctype>
+#include <cstdlib>
+#include <iostream>
 
 extern "C" {
     #include <limits.h>
@@ -9,7 +12,7 @@ extern "C" {
     #include <libgen.h>
 }
 
-CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp")
+CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp"), isPHPBin(true)
 {
     this->allowed_version.insert("php53");
     this->allowed_version.insert("php55");
@@ -68,13 +71,30 @@ void CPHPRunner::selectPHPVersion(const char *argv0) {
     char *dupargv = strdup(argv0);
     char *dupargv_original = dupargv;
     char *bname = basename(dupargv);
-    if (this->allowed_version.find(bname) != this->allowed_version.end()) {
-        this->selected_version = bname;
-    } else {
-        this->selected_version = this->default_version;
-    }
-    free(dupargv_original);
+    int version = 0;
+    size_t bname_length = strlen(bname);
+    char selected_version_local[64];
+    memset(selected_version_local, 0, 64);
 
+    if (strstr(bname, "php") != bname) {
+        this->isPHPBin = false;
+    }
+
+    for (size_t i=0; i<bname_length; i++) {
+        if (isdigit(bname[i])) {
+           version = atoi(bname+i);
+           if (version > 50 && version < 90) {
+               snprintf(selected_version_local, 64, "php%d", version);
+               this->selected_version.assign(selected_version_local);
+               free(dupargv_original);
+               return;
+           }
+           break;
+        }
+    }
+
+    this->selected_version = this->default_version;
+    free(dupargv_original);
 }
 
 void CPHPRunner::getSelectedVersion(std::string *retstring) {
@@ -89,17 +109,31 @@ void CPHPRunner::getArgs(std::vector<std::string> *retargs) {
 
 void CPHPRunner::buildPHParguments(int argc, char **argv) {
     std::string             args_merged;
-    this->args.push_back("/usr/bin/php");
-    for (int i=1; i<argc; i++) {
-        if (argv[i] == NULL)
-            break;
-        if (i == 0)
-            args_merged += argv[i];
-        else {
-            args_merged += " ";
-            args_merged += argv[i];
+    if (this->isPHPBin) {
+        this->args.push_back("/usr/bin/php");
+        for (int i=1; i<argc; i++) {
+            if (argv[i] == NULL)
+                break;
+            if (i == 0)
+                args_merged += argv[i];
+            else {
+                args_merged += " ";
+                args_merged += argv[i];
+            }
+            args.push_back(argv[i]);
         }
-        args.push_back(argv[i]);
+    } else {
+        for (int i=0; i<argc; i++) {
+            if (argv[i] == NULL)
+                break;
+            if (i == 0)
+                args_merged += argv[i];
+            else {
+                args_merged += " ";
+                args_merged += argv[i];
+            }
+            args.push_back(argv[i]);
+        }
     }
 
 }
