@@ -22,6 +22,8 @@ CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp")
     this->allowed_version.insert("php72");
     this->allowed_version.insert("php73");
     this->allowed_version.insert("php74");
+    this->allowed_version.insert("php80");
+    this->allowed_version.insert("php81");
 
     if (this->isPHPLocked())
         throw std::runtime_error("PHP cli is temporarily disabled");

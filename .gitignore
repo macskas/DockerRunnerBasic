@@ -10,6 +10,7 @@
 *.dll
 *.dylib
 
+docker-runner
 # Qt-es
 
 object_script.*.Release
