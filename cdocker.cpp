@@ -1,18 +1,14 @@
 #include "cdocker.h"
 
-#include <iostream>
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
 #include <stdexcept>
-#include <cerrno>
 #include <cstdio>
 
 extern "C" {
-#include <limits.h>
 #include <sys/dir.h>
 #include <unistd.h>
-#include <signal.h>
 #include <sched.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -70,14 +66,14 @@ CDocker::CDocker() : dockerPath("/var/lib/docker/containers"), dockerConfig("con
 }
 
 void CDocker::loadConfigDirectory() {
-    DIR                 *dir = NULL;
+    DIR                 *dir = nullptr;
     const char          *dpath = this->dockerPath.c_str();
-    struct dirent       *ent = NULL;
+    struct dirent       *ent = nullptr;
     char                fbuf[PATH_MAX];
     memset(fbuf, 0, PATH_MAX);
 
-    if ((dir = opendir (dpath)) != NULL) {
-        while ((ent = readdir (dir)) != NULL) {
+    if ((dir = opendir (dpath)) != nullptr) {
+        while ((ent = readdir (dir)) != nullptr) {
             if (strcmp(ent->d_name, ".") == 0) {
                 continue;
             } else if (strcmp(ent->d_name, "..") == 0) {
@@ -87,7 +83,7 @@ void CDocker::loadConfigDirectory() {
             this->loadConfigV2((const char*)fbuf);
         }
         closedir(dir);
-        dir = NULL;
+        dir = nullptr;
     } else {
         perror("opendir()");
         throw std::runtime_error("opendir failed.");
@@ -97,7 +93,7 @@ void CDocker::loadConfigDirectory() {
 void CDocker::loadConfigV2(const char *configFile) {
     FILE        *f;
     size_t      lSize = 0;
-    char        *fcontent = NULL;
+    char        *fcontent = nullptr;
     std::string hostname;
     size_t      lRead = 0;
     int         pid;
@@ -115,7 +111,7 @@ void CDocker::loadConfigV2(const char *configFile) {
     }
 
     fcontent = (char*)calloc(lSize, sizeof(char));
-    if (fcontent == NULL) {
+    if (fcontent == nullptr) {
         fclose(f);
         throw std::runtime_error("Calloc failed. Out of memory");
     }
@@ -152,19 +148,19 @@ int CDocker::findKeyString(char *fcontent, const char *k, std::string *ret)
 {
     char fdata[DBUF_SIZE_SMALL];
     memset(fdata, 0, DBUF_SIZE_SMALL);
-    char *tmp = NULL;
-    char *tmp_e = NULL;
+    char *tmp = nullptr;
+    char *tmp_e = nullptr;
     std::string lookupString;
     lookupString += "\"";
     lookupString += k;
     lookupString += "\":";
     tmp = strstr(fcontent, lookupString.c_str());
-    if (tmp == NULL)
+    if (tmp == nullptr)
         return -1;
     if (strlen(tmp) > strlen(k)+4)
         tmp+=strlen(k)+4;
     tmp_e = strchr(tmp, '"');
-    if (tmp_e == NULL)
+    if (tmp_e == nullptr)
         return -2;
     if (tmp_e-tmp <= 1)
         return -3;
@@ -177,25 +173,25 @@ int CDocker::findKeyInt(char *fcontent, const char *k, int *ret)
 {
     char fdata[DBUF_SIZE_SMALL];
     memset(fdata, 0, DBUF_SIZE_SMALL);
-    char *tmp = NULL;
-    char *tmp_e = NULL;
+    char *tmp = nullptr;
+    char *tmp_e = nullptr;
     int rint = 0;
     std::string lookupString;
     lookupString += "\"";
     lookupString += k;
     lookupString += "\":";
     tmp = strstr(fcontent, lookupString.c_str());
-    if (tmp == NULL)
+    if (tmp == nullptr)
         return -1;
     if (strlen(tmp) > strlen(k)+3)
         tmp+=strlen(k)+3;
 
     tmp_e = tmp;
-    while (tmp_e != NULL && isdigit(*tmp_e)) {
+    while (tmp_e != nullptr && isdigit(*tmp_e)) {
         tmp_e++;
     }
 
-    if (tmp_e == NULL || tmp_e == tmp)
+    if (tmp_e == nullptr || tmp_e == tmp)
         return -2;
     if (tmp_e-tmp <= 1)
         return -3;
@@ -209,7 +205,7 @@ int CDocker::findKeyInt(char *fcontent, const char *k, int *ret)
 void CDocker::setNSByHostname(std::string hostname) {
     std::map<std::string, CDockerContainer>::iterator	it;
     char                                                fbuf[PATH_MAX];
-    NamespaceFile                                       *nsfile = NULL;
+    NamespaceFile                                       *nsfile = nullptr;
 
     std::vector<class NamespaceFile*>                   namespace_files;
     namespace_files.push_back(new NamespaceFile(CLONE_NEWIPC, "ipc"));
@@ -242,7 +238,7 @@ void CDocker::setNSByHostname(std::string hostname) {
         }
         nsfile->closefd();
         delete nsfile;
-        namespace_files[i] = NULL;
+        namespace_files[i] = nullptr;
     }
 }
 
@@ -254,7 +250,7 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
     char           cwd[PATH_MAX];
     memset(cwd,0,PATH_MAX);
 
-    if (getcwd(cwd, PATH_MAX) == NULL) {
+    if (getcwd(cwd, PATH_MAX) == nullptr) {
         perror("ERROR: getcwd()");
         throw std::runtime_error( "getcwd failed" );
     }

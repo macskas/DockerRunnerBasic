@@ -7,9 +7,9 @@
 #include <iostream>
 
 extern "C" {
-    #include <limits.h>
-    #include <unistd.h>
-    #include <libgen.h>
+#include <limits.h>
+#include <unistd.h>
+#include <libgen.h>
 }
 
 CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp"), isPHPBin(true)
@@ -24,6 +24,9 @@ CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp")
     this->allowed_version.insert("php74");
     this->allowed_version.insert("php80");
     this->allowed_version.insert("php81");
+    this->allowed_version.insert("php82");
+    this->allowed_version.insert("php83");
+    this->allowed_version.insert("php84");
 
     if (this->isPHPLocked())
         throw std::runtime_error("PHP cli is temporarily disabled");
@@ -38,10 +41,10 @@ bool CPHPRunner::isPHPLocked() {
 void CPHPRunner::setDefaultVersion() {
     const char *default_php_file = "/etc/docker-runner.default_php";
     char        buffer[32];
-    char        *pos = NULL;
+    char        *pos = nullptr;
     memset(buffer, 0, 32);
 
-    FILE        *f;
+    FILE        *f = nullptr;
 
     if (access(default_php_file, R_OK) != 0)
         return;
@@ -50,7 +53,7 @@ void CPHPRunner::setDefaultVersion() {
     if (!f)
         return;
 
-    if (fgets(buffer, 32, f) == NULL) {
+    if (fgets(buffer, 32, f) == nullptr) {
         fclose(f);
         return;
     }
@@ -65,7 +68,6 @@ void CPHPRunner::setDefaultVersion() {
         this->default_version = buffer;
     }
     fclose(f);
-    return;
 }
 
 void CPHPRunner::selectPHPVersion(const char *argv0) {
@@ -82,16 +84,13 @@ void CPHPRunner::selectPHPVersion(const char *argv0) {
         this->isPHPBin = false;
     }
 
-    for (size_t i=0; i<bname_length; i++) {
-        if (isdigit(bname[i])) {
-           version = atoi(bname+i);
-           if (version > 50 && version < 90) {
-               snprintf(selected_version_local, 64, "php%d", version);
-               this->selected_version.assign(selected_version_local);
-               free(dupargv_original);
-               return;
-           }
-           break;
+    if (bname_length > 2 && isdigit(bname[bname_length-1]) && isdigit(bname[bname_length-2])) {
+        version = (int)strtol(bname+bname_length-2, nullptr, 10);
+        if (version > 50 && version < 90) {
+            snprintf(selected_version_local, 64, "php%d", version);
+            this->selected_version.assign(selected_version_local);
+            free(dupargv_original);
+            return;
         }
     }
 
@@ -114,7 +113,7 @@ void CPHPRunner::buildPHParguments(int argc, char **argv) {
     if (this->isPHPBin) {
         this->args.push_back("/usr/bin/php");
         for (int i=1; i<argc; i++) {
-            if (argv[i] == NULL)
+            if (argv[i] == nullptr)
                 break;
             if (i == 0)
                 args_merged += argv[i];
@@ -126,7 +125,7 @@ void CPHPRunner::buildPHParguments(int argc, char **argv) {
         }
     } else {
         for (int i=0; i<argc; i++) {
-            if (argv[i] == NULL)
+            if (argv[i] == nullptr)
                 break;
             if (i == 0)
                 args_merged += argv[i];
