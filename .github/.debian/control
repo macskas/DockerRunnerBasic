@@ -1,0 +1,12 @@
+Source: docker-runner-php
+Section: PHP
+Priority: optional
+Build-Depends: debhelper (>= 8.0.0)
+Maintainer: macskas
+Homepage: http://github.com/macskas/DockerRunnerBasic
+
+Package: docker-runner-php
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: cli php runner for docker containers, heavy stdout
+ Docker exec replacement for heavy duty, multiuser environment

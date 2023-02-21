@@ -2,10 +2,8 @@
 #include <vector>
 #include <string>
 #include <cstring>
-#include <stdexcept>
 #include <cstdlib>
 
-#include "cdockercontainer.h"
 #include "cdocker.h"
 #include "cphprunner.h"
 #include "globals.h"
@@ -13,7 +11,6 @@
 extern "C" {
 #include <libgen.h>
 #include <limits.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 }
 
@@ -36,8 +33,8 @@ void handle_getopt(int argc, char **argv)
         return;
 
     char        resolved_path[PATH_MAX];
-    struct stat sb_original;
-    struct stat sb_realpath;
+    struct stat sb_original{};
+    struct stat sb_realpath{};
 
     memset(resolved_path, 0, PATH_MAX);
     if (lstat(argv[0], &sb_original) == -1) {
@@ -74,14 +71,17 @@ int main(int argc, char **argv)
 
     std::vector<std::string>    newargs;
     std::string                 dockerHostname("-");
+    int                         selected_version_int = 0;
     CDocker                     Docker;
     CPHPRunner                  PHPRunner;
+
     PHPRunner.setDefaultVersion();
     PHPRunner.selectPHPVersion(argv[0]);
     PHPRunner.buildPHParguments(argc, argv);
     PHPRunner.getArgs(&newargs);
     PHPRunner.getSelectedVersion(&dockerHostname);
+    selected_version_int = PHPRunner.getSelectedVersion();
 
-    return Docker.run(dockerHostname, newargs);
+    return Docker.run(dockerHostname, selected_version_int, newargs);
 }
 

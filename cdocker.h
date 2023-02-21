@@ -23,11 +23,11 @@ class NamespaceFile {
             this->name = name;
         }
 
-        void setfd(int fd) {
-            this->fd = fd;
+        void setfd(int iFd) {
+            this->fd = iFd;
         }
 
-        void closefd() {
+        void closefd() const {
             if (this->fd != -1)
                 close(this->fd);
         }
@@ -39,7 +39,10 @@ class CDocker
         std::string                                 dockerPath;
         std::string                                 dockerConfig;
         std::map<std::string, CDockerContainer>     dockerContainers;
+        std::map<std::string, CDockerContainer>     activeContainers;
         size_t                                      maxConfigFileSize;
+        // secondary search
+        std::string                                 path_activeContainers = "/tmp/docker-config/active-containers.json";
 
     public:
         CDocker();
@@ -48,14 +51,12 @@ class CDocker
         void loadConfigV2(const char *configFile);
 
     private:
-        int findKeyString(char *fcontent, const char *k, std::string *ret);
-        int findKeyInt(char *fcontent, const char *k, int *ret);
-
-    private:
-        void setNSByHostname(std::string hostname);
+        void setNSByHostname(const std::string &hostname, int phpVersionInt);
 
     public:
-        int run(std::string hostname, std::vector<std::string> args);
+        int run(const std::string& hostname, int selectedVersion, std::vector<std::string> args);
+
+    void loadActiveContainers();
 };
 
 #endif // CDOCKER_H

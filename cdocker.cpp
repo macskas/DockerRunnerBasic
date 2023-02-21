@@ -5,6 +5,9 @@
 #include <cctype>
 #include <stdexcept>
 #include <cstdio>
+#include <iostream>
+#include <sstream>
+#include <fstream>
 
 extern "C" {
 #include <sys/dir.h>
@@ -12,16 +15,16 @@ extern "C" {
 #include <sched.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <grp.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
 }
 
 #include "cdockercontainer.h"
-#include "globals.h"
+#include "json.hpp"
 
-
-static void continue_as_child(void)
+static void continue_as_child()
 {
     if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0) != 0) {
         perror("prctl");
@@ -85,54 +88,113 @@ void CDocker::loadConfigDirectory() {
         closedir(dir);
         dir = nullptr;
     } else {
-        perror("opendir()");
-        throw std::runtime_error("opendir failed.");
+        std::string errmsg = "opendir failed(";
+        errmsg += __PRETTY_FUNCTION__;
+        errmsg += ", ";
+        errmsg += dpath;
+        errmsg += ", ";
+        errmsg += strerror(errno);
+        errmsg += ")";
+        throw std::runtime_error(errmsg);
+    }
+}
+
+void CDocker::loadActiveContainers() {
+    struct stat sb{};
+    if (access(path_activeContainers.c_str(), R_OK) != 0)
+        return;
+
+    if (stat(path_activeContainers.c_str(), &sb) != 0)
+        return;
+
+    if ((size_t)sb.st_size > this->maxConfigFileSize)
+        return;
+
+    std::ifstream f(path_activeContainers);
+    nlohmann::json jActiveContainers;
+    try {
+        jActiveContainers = nlohmann::json::parse(f);
+    } catch (...) {
+        return;
+    }
+    std::string php_version;
+    std::string container_name;
+    int pid = 0;
+    for (auto it_pv = jActiveContainers.begin(); it_pv != jActiveContainers.end(); it_pv++) {
+        php_version = it_pv.key();
+        auto it_value = it_pv.value();
+
+        if (!it_value.is_object()) {
+            continue;
+        }
+
+        if (!it_value["name"].is_string())
+            continue;
+        container_name = it_value["name"].get<std::string>();
+
+        if (!it_value["pid"].is_number())
+            continue;
+
+        pid = it_value["pid"].get<int>();
+        if (pid <= 0)
+            continue;
+
+        {
+            CDockerContainer DC;
+            DC.setPid(pid);
+            DC.setName(container_name);
+            this->activeContainers[php_version] = DC;
+        }
     }
 }
 
 void CDocker::loadConfigV2(const char *configFile) {
-    FILE        *f;
-    size_t      lSize = 0;
-    char        *fcontent = nullptr;
+    int pid = 0;
     std::string hostname;
-    size_t      lRead = 0;
-    int         pid;
+    struct stat sb{};
     if (access(configFile, R_OK) != 0)
         return;
-    f = fopen(configFile, "r");
-    if (!f)
-        return;
-    fseek(f, 0, SEEK_END);
-    lSize = ftell(f);
-    rewind(f);
-    if (lSize > this->maxConfigFileSize || lSize < 10) {
-        fclose(f);
-        return;
-    }
 
-    fcontent = (char*)calloc(lSize, sizeof(char));
-    if (fcontent == nullptr) {
-        fclose(f);
-        throw std::runtime_error("Calloc failed. Out of memory");
-    }
+    if (stat(configFile, &sb) != 0)
+        return;
 
-    lRead = fread(fcontent, 1, lSize, f);
-    fclose(f);
-    if (lRead != lSize) {
-        free(fcontent);
+    if ((size_t)sb.st_size > this->maxConfigFileSize)
+        return;
+
+    std::ifstream f(configFile);
+    nlohmann::json jConfigV2;
+    try {
+        jConfigV2 = nlohmann::json::parse(f);
+    } catch (...) {
         return;
     }
 
-    this->findKeyString(fcontent, "Hostname", &hostname);
-    this->findKeyInt(fcontent, "Pid", &pid);
-    free(fcontent);
+    if (!jConfigV2.is_object())
+        return;
+    if (!jConfigV2["Config"].is_object())
+        return;
+    if (!jConfigV2["State"].is_object())
+        return;
+    auto jConfigState = jConfigV2["State"];
+    auto jConfigConfig = jConfigV2["Config"];
 
+    if (!jConfigState["Running"].is_boolean())
+        return;
+
+    bool state_running = jConfigState["Running"].get<bool>();
+    if (!state_running)
+        return;
+    if (!jConfigState["Pid"].is_number())
+        return;
+
+    pid = jConfigState["Pid"].get<int>();
     if (pid <= 0)
         return;
-
+    if (!jConfigConfig["Hostname"].is_string())
+        return;
+    hostname = jConfigConfig["Hostname"].get<std::string>();
     if (hostname.length() < 1)
         return;
-
     if (kill(pid, 0) != 0)
         return;
 
@@ -141,68 +203,9 @@ void CDocker::loadConfigV2(const char *configFile) {
     DC.setPid(pid);
     DC.setConfigPath(configFile);
     this->dockerContainers[hostname] = DC;
-
 }
 
-int CDocker::findKeyString(char *fcontent, const char *k, std::string *ret)
-{
-    char fdata[DBUF_SIZE_SMALL];
-    memset(fdata, 0, DBUF_SIZE_SMALL);
-    char *tmp = nullptr;
-    char *tmp_e = nullptr;
-    std::string lookupString;
-    lookupString += "\"";
-    lookupString += k;
-    lookupString += "\":";
-    tmp = strstr(fcontent, lookupString.c_str());
-    if (tmp == nullptr)
-        return -1;
-    if (strlen(tmp) > strlen(k)+4)
-        tmp+=strlen(k)+4;
-    tmp_e = strchr(tmp, '"');
-    if (tmp_e == nullptr)
-        return -2;
-    if (tmp_e-tmp <= 1)
-        return -3;
-    strncpy(fdata, tmp, tmp_e-tmp);
-    ret->assign(fdata);
-    return 0;
-}
-
-int CDocker::findKeyInt(char *fcontent, const char *k, int *ret)
-{
-    char fdata[DBUF_SIZE_SMALL];
-    memset(fdata, 0, DBUF_SIZE_SMALL);
-    char *tmp = nullptr;
-    char *tmp_e = nullptr;
-    int rint = 0;
-    std::string lookupString;
-    lookupString += "\"";
-    lookupString += k;
-    lookupString += "\":";
-    tmp = strstr(fcontent, lookupString.c_str());
-    if (tmp == nullptr)
-        return -1;
-    if (strlen(tmp) > strlen(k)+3)
-        tmp+=strlen(k)+3;
-
-    tmp_e = tmp;
-    while (tmp_e != nullptr && isdigit(*tmp_e)) {
-        tmp_e++;
-    }
-
-    if (tmp_e == nullptr || tmp_e == tmp)
-        return -2;
-    if (tmp_e-tmp <= 1)
-        return -3;
-
-    strncpy(fdata, tmp, tmp_e-tmp);
-    rint = atoi(fdata);
-    *ret = rint;
-    return 0;
-}
-
-void CDocker::setNSByHostname(std::string hostname) {
+void CDocker::setNSByHostname(const std::string &hostname, int phpVersionInt) {
     std::map<std::string, CDockerContainer>::iterator	it;
     char                                                fbuf[PATH_MAX];
     NamespaceFile                                       *nsfile = nullptr;
@@ -214,14 +217,30 @@ void CDocker::setNSByHostname(std::string hostname) {
     namespace_files.push_back(new NamespaceFile(CLONE_NEWPID, "pid"));
     namespace_files.push_back(new NamespaceFile(CLONE_NEWNS,  "mnt"));
 
+    int pid = 0;
+
     it = this->dockerContainers.find(hostname);
-    if (it == this->dockerContainers.end()) {
-        throw std::invalid_argument("docker container with this hostname not found.");
+    if (it != this->dockerContainers.end()) {
+        pid = it->second.getPid();
     }
-    int pid = it->second.getPid();
+    if (pid == 0) {
+        int version_major = phpVersionInt/10;
+        int version_minor = phpVersionInt % 10;
+        char buffer[32]{};
+        snprintf(buffer, 32, "%d.%d", version_major, version_minor);
+        auto it_ac = this->activeContainers.find(buffer);
+        if (it_ac != this->activeContainers.end()) {
+            pid = it_ac->second.getPid();
+        }
+    }
+    if (!pid) {
+        std::stringstream ss;
+        ss << "setNSByHostname - php version not found(hostname: " << hostname << ", php_version_int: " << phpVersionInt << ")";
+        throw std::runtime_error(ss.str());
+    }
 
     memset(fbuf, 0, PATH_MAX);
-    for (int i=0, e=namespace_files.size(); i<e; ++i) {
+    for (size_t i=0, e=namespace_files.size(); i<e; ++i) {
         nsfile = namespace_files[i];
         snprintf(fbuf, PATH_MAX, "/proc/%d/ns/%s", pid, nsfile->name.c_str());
         nsfile->fd = open(fbuf, O_RDONLY);
@@ -230,7 +249,7 @@ void CDocker::setNSByHostname(std::string hostname) {
             throw std::runtime_error("NS open failed.");
         }
     }
-    for (int i=0, e=namespace_files.size(); i<e; ++i) {
+    for (size_t i=0, e=namespace_files.size(); i<e; ++i) {
         nsfile = namespace_files[i];
         if (setns(nsfile->fd, nsfile->nstype) == -1) {
             perror("setns");
@@ -243,9 +262,9 @@ void CDocker::setNSByHostname(std::string hostname) {
 }
 
 
-int CDocker::run(std::string hostname, std::vector<std::string> args) {
-    int             original_uid	= getuid();
-    int             original_gid	= getgid();
+int CDocker::run(const std::string& hostname, int selectedVersion, std::vector<std::string> args) {
+    int             original_uid	= (int)getuid();
+    int             original_gid	= (int)getgid();
 
     char           cwd[PATH_MAX];
     memset(cwd,0,PATH_MAX);
@@ -265,6 +284,7 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
             throw std::runtime_error("setuid failed.");
         }
     }
+    this->loadActiveContainers();
     this->loadConfigDirectory();
 
     const char      *execPath       = args[0].c_str();
@@ -278,8 +298,7 @@ int CDocker::run(std::string hostname, std::vector<std::string> args) {
         new_argv[i] = (char*)args[i].c_str();
     }
 
-    this->setNSByHostname(hostname);
-
+    this->setNSByHostname(hostname, selectedVersion);
 
     if (setgid(original_gid) != 0) {
         perror("setgid");

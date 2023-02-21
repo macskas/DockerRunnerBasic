@@ -9,11 +9,14 @@ private:
     int         pid;
     std::string hostname;
     std::string configPath;
+    std::string name;
+
 public:
     CDockerContainer();
 
     void setHostname(std::string iHostname);
     void setPid(int iPid);
+    void setName(std::string iName);
     void setConfigPath(std::string iConfigPath);
 
 public:

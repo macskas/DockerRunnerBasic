@@ -4,30 +4,16 @@
 #include <cstring>
 #include <cctype>
 #include <cstdlib>
-#include <iostream>
+// #include <iostream>
 
 extern "C" {
-#include <limits.h>
+// #include <limits.h>
 #include <unistd.h>
 #include <libgen.h>
 }
 
-CPHPRunner::CPHPRunner() : default_version("php72"), lockFile("/var/lock/nophp"), isPHPBin(true)
+CPHPRunner::CPHPRunner()
 {
-    this->allowed_version.insert("php53");
-    this->allowed_version.insert("php55");
-    this->allowed_version.insert("php56");
-    this->allowed_version.insert("php70");
-    this->allowed_version.insert("php71");
-    this->allowed_version.insert("php72");
-    this->allowed_version.insert("php73");
-    this->allowed_version.insert("php74");
-    this->allowed_version.insert("php80");
-    this->allowed_version.insert("php81");
-    this->allowed_version.insert("php82");
-    this->allowed_version.insert("php83");
-    this->allowed_version.insert("php84");
-
     if (this->isPHPLocked())
         throw std::runtime_error("PHP cli is temporarily disabled");
 }
@@ -38,13 +24,37 @@ bool CPHPRunner::isPHPLocked() {
     return false;
 }
 
-void CPHPRunner::setDefaultVersion() {
-    const char *default_php_file = "/etc/docker-runner.default_php";
-    char        buffer[32];
-    char        *pos = nullptr;
-    memset(buffer, 0, 32);
+long CPHPRunner::getPHPVersionFromString(const std::string& phpVersion) {
+    size_t phpversion_length = phpVersion.length();
+    size_t digit_length = 0;
+    const size_t digit_length_min = 2;
 
+    for (auto i = phpversion_length-1; i!=0; i--) {
+        if (std::isdigit(phpVersion.at(i))) {
+            digit_length++;
+        } else {
+            break;
+        }
+    }
+
+    if (digit_length < digit_length_min)
+        return 0;
+
+    std::string digit_parts = phpVersion.substr(phpversion_length-digit_length);
+    long version = strtol(digit_parts.c_str(), nullptr, 10);
+
+    if (version < PHP_VERSION_MIN || version > PHP_VERSION_MAX)
+        return 0;
+
+    return version;
+}
+
+void CPHPRunner::setDefaultVersion() {
+    const char  *default_php_file = "/etc/docker-runner.default_php";
+    char        buffer[32]{};
+    char        *pos = nullptr;
     FILE        *f = nullptr;
+    std::string bufferStr;
 
     if (access(default_php_file, R_OK) != 0)
         return;
@@ -57,17 +67,23 @@ void CPHPRunner::setDefaultVersion() {
         fclose(f);
         return;
     }
+    fclose(f);
 
     pos = strchr(buffer, '\n');
     if (pos) {
         *pos = '\0';
     }
 
-
-    if (this->allowed_version.find(buffer) != this->allowed_version.end()) {
-        this->default_version = buffer;
+    if (strstr(buffer, "php") != buffer) {
+        return;
     }
-    fclose(f);
+
+    bufferStr.assign(buffer);
+    long def_ver = CPHPRunner::getPHPVersionFromString(bufferStr);
+    if (def_ver) {
+        this->default_version = buffer;
+        this->selected_version_int = (int)(def_ver);
+    }
 }
 
 void CPHPRunner::selectPHPVersion(const char *argv0) {
@@ -75,8 +91,6 @@ void CPHPRunner::selectPHPVersion(const char *argv0) {
     char *dupargv = strdup(argv0);
     char *dupargv_original = dupargv;
     char *bname = basename(dupargv);
-    int version = 0;
-    size_t bname_length = strlen(bname);
     char selected_version_local[64];
     memset(selected_version_local, 0, 64);
 
@@ -84,14 +98,13 @@ void CPHPRunner::selectPHPVersion(const char *argv0) {
         this->isPHPBin = false;
     }
 
-    if (bname_length > 2 && isdigit(bname[bname_length-1]) && isdigit(bname[bname_length-2])) {
-        version = (int)strtol(bname+bname_length-2, nullptr, 10);
-        if (version > 50 && version < 90) {
-            snprintf(selected_version_local, 64, "php%d", version);
-            this->selected_version.assign(selected_version_local);
-            free(dupargv_original);
-            return;
-        }
+    long pver = CPHPRunner::getPHPVersionFromString(bname);
+    if (pver) {
+        this->selected_version_int = (int)(pver);
+        snprintf(selected_version_local, 64, "php%d", this->selected_version_int);
+        this->selected_version.assign(selected_version_local);
+        free(dupargv_original);
+        return;
     }
 
     this->selected_version = this->default_version;
@@ -100,18 +113,20 @@ void CPHPRunner::selectPHPVersion(const char *argv0) {
 
 void CPHPRunner::getSelectedVersion(std::string *retstring) {
     *retstring = this->selected_version;
-    return;
+}
+
+int CPHPRunner::getSelectedVersion() {
+    return this->selected_version_int;
 }
 
 void CPHPRunner::getArgs(std::vector<std::string> *retargs) {
     *retargs = this->args;
-    return;
 }
 
 void CPHPRunner::buildPHParguments(int argc, char **argv) {
     std::string             args_merged;
     if (this->isPHPBin) {
-        this->args.push_back("/usr/bin/php");
+        this->args.emplace_back("/usr/bin/php");
         for (int i=1; i<argc; i++) {
             if (argv[i] == nullptr)
                 break;
@@ -121,7 +136,7 @@ void CPHPRunner::buildPHParguments(int argc, char **argv) {
                 args_merged += " ";
                 args_merged += argv[i];
             }
-            args.push_back(argv[i]);
+            args.emplace_back(argv[i]);
         }
     } else {
         for (int i=0; i<argc; i++) {
@@ -133,7 +148,7 @@ void CPHPRunner::buildPHParguments(int argc, char **argv) {
                 args_merged += " ";
                 args_merged += argv[i];
             }
-            args.push_back(argv[i]);
+            args.emplace_back(argv[i]);
         }
     }
 

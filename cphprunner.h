@@ -5,15 +5,18 @@
 #include <string>
 #include <vector>
 
+#define PHP_VERSION_MIN 40
+#define PHP_VERSION_MAX 200
+
 class CPHPRunner
 {
 private:
-    std::set<std::string>		allowed_version;
-    std::string                 default_version;
+    std::string                 default_version = "php72";
     std::string                 selected_version;
+    int                         selected_version_int = 0;
     std::vector<std::string>	args;
-    std::string                 lockFile;
-    bool                        isPHPBin;
+    std::string                 lockFile = "/var/lock/nophp";
+    bool                        isPHPBin = true;
 
 public:
     CPHPRunner();
@@ -26,6 +29,9 @@ public:
     void getArgs(std::vector<std::string> *retargs);
     bool isPHPLocked();
 
+    static long getPHPVersionFromString(const std::string &phpVersion);
+
+    int getSelectedVersion();
 };
 
 #endif // CPHPRUNNER_H
