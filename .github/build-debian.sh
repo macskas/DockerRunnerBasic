@@ -47,12 +47,12 @@ do_make_deb()
     dh_compress
     dh_link
     fakeroot dh_gencontrol
-    dh_installinit
+    #dh_installinit
     fakeroot dh_md5sums
 
     rm -rf Release
     mkdir -p Release
-    dh_builddeb --destdir=Release --filename="$RELEASE_PREFIX.deb"
+    fakeroot dh_builddeb --destdir=Release --filename="$RELEASE_PREFIX.deb"
 }
 
 do_release_binary()
