@@ -270,8 +270,9 @@ int CDocker::run(const std::string& hostname, int selectedVersion, std::vector<s
     memset(cwd,0,PATH_MAX);
 
     if (getcwd(cwd, PATH_MAX) == nullptr) {
-        perror("ERROR: getcwd()");
-        throw std::runtime_error( "getcwd failed" );
+        cwd[0] = 0;
+        //perror("ERROR: getcwd()");
+        //throw std::runtime_error( "getcwd failed" );
     }
 
     if (original_uid != 0) {
@@ -316,7 +317,7 @@ int CDocker::run(const std::string& hostname, int selectedVersion, std::vector<s
     if (seteuid(original_uid) != 0)
         throw std::runtime_error("seteuid failed.");
 
-    if (chdir(cwd) != 0) {
+    if (cwd[0] && chdir(cwd) != 0) {
 
     }
 
