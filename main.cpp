@@ -7,6 +7,7 @@
 #include "cdocker.h"
 #include "cphprunner.h"
 #include "globals.h"
+#include "utils.h"
 
 extern "C" {
 #include <libgen.h>
@@ -82,6 +83,7 @@ int main(int argc, char **argv)
     PHPRunner.getSelectedVersion(&dockerHostname);
     selected_version_int = PHPRunner.getSelectedVersion();
 
+    load_environment_file();
     return Docker.run(dockerHostname, selected_version_int, newargs);
 }
 
