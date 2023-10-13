@@ -49,6 +49,7 @@ do_make_deb()
     fakeroot dh_gencontrol
     #dh_installinit
     fakeroot dh_md5sums
+    fakeroot dh_installdeb
 
     rm -rf Release
     mkdir -p Release
